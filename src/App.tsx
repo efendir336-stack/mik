@@ -50,7 +50,33 @@ export default function App() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [mapUrl, setMapUrl] = useState('https://www.openstreetmap.org/export/embed.html?bbox=95.0,-11.0,141.0,6.0&layer=mapnik'); // Default to Indonesia
-  const [zoom, setZoom] = useState(5);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
+
+  // Initial mock data for "Live" feel
+  useEffect(() => {
+    const initialLog = [
+      { id: 1, number: '+62 812 XXXX 1234', region: 'ID', time: 'Just now', status: 'Success' },
+      { id: 2, number: '+60 11 XXXX 5678', region: 'MY', time: '2m ago', status: 'Success' },
+      { id: 3, number: '+65 9XXX 4321', region: 'SG', time: '5m ago', status: 'Success' },
+    ];
+    setActivityLog(initialLog);
+
+    // Simulate occasional "global" activity
+    const interval = setInterval(() => {
+      const prefixes = ['+62', '+60', '+65', '+1', '+91', '+61'];
+      const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const newActivity = {
+        id: Date.now(),
+        number: `${randomPrefix} ${Math.floor(Math.random() * 900)} XXXX ${Math.floor(Math.random() * 9000)}`,
+        region: randomPrefix === '+62' ? 'ID' : randomPrefix === '+60' ? 'MY' : 'INTL',
+        time: 'Live',
+        status: 'Success'
+      };
+      setActivityLog(prev => [newActivity, ...prev.slice(0, 4)]);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const performAnalysis = useCallback((number: string) => {
     if (!number) return;
@@ -72,16 +98,26 @@ export default function App() {
       const country = parsed.country;
       const countryName = new Intl.DisplayNames(['id'], { type: 'region' }).of(country || 'ID');
       
-      setResult({
+      const newResult = {
         number: parsed.formatInternational(),
         country: countryName,
         carrier: 'Public Provider',
         type: parsed.getType() || 'Mobile',
         region: country,
-      });
+      };
+
+      setResult(newResult);
+
+      // Add to activity log
+      setActivityLog(prev => [{
+        id: Date.now(),
+        number: newResult.number,
+        region: country,
+        time: 'Just now',
+        status: 'Success'
+      }, ...prev.slice(0, 4)]);
 
       // Map Bounding Boxes for OpenStreetMap (Simplified)
-      // Format: [min_lon, min_lat, max_lon, max_lat]
       const bboxes: Record<string, string> = {
         'ID': '95.011,-11.001,141.011,6.072',
         'US': '-124.784,24.743,-66.951,49.345',
@@ -250,6 +286,42 @@ export default function App() {
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
                 <p className="text-xs text-zinc-400 leading-relaxed">Peta di samping menggunakan <span className="text-zinc-200">OpenStreetMap</span> yang bersifat open-source dan gratis selamanya.</p>
               </div>
+            </div>
+          </section>
+
+          {/* Live Activity Feed */}
+          <section className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-zinc-100 font-bold text-sm">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <h3>Live Activity Log</h3>
+              </div>
+              <span className="text-[10px] text-zinc-500 font-mono">REAL-TIME FEED</span>
+            </div>
+            <div className="space-y-3">
+              <AnimatePresence initial={false}>
+                {activityLog.map((log) => (
+                  <motion.div 
+                    key={log.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-[10px] font-bold text-zinc-500">
+                        {log.region}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-300">{log.number}</p>
+                        <p className="text-[10px] text-zinc-500">{log.time}</p>
+                      </div>
+                    </div>
+                    <div className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      {log.status}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </section>
         </div>
