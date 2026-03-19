@@ -117,19 +117,38 @@ export default function App() {
         status: 'Success'
       }, ...prev.slice(0, 4)]);
 
-      // Map Bounding Boxes for OpenStreetMap (Simplified)
-      const bboxes: Record<string, string> = {
-        'ID': '95.011,-11.001,141.011,6.072',
-        'US': '-124.784,24.743,-66.951,49.345',
-        'MY': '99.640,0.853,119.268,7.353',
-        'SG': '103.605,1.130,104.035,1.470',
-        'GB': '-8.649,49.864,1.763,60.860',
-        'AU': '112.921,-43.634,153.638,-10.668',
-        'IN': '68.126,6.767,97.395,35.513',
+      // Extensive Coordinate Database for better accuracy
+      const countryCoords: Record<string, { lat: number, lon: number, zoom: number }> = {
+        'ID': { lat: -0.7893, lon: 113.9213, zoom: 5 },
+        'MY': { lat: 4.2105, lon: 101.9758, zoom: 6 },
+        'SG': { lat: 1.3521, lon: 103.8198, zoom: 12 },
+        'TH': { lat: 15.8700, lon: 100.9925, zoom: 6 },
+        'VN': { lat: 14.0583, lon: 108.2772, zoom: 6 },
+        'PH': { lat: 12.8797, lon: 121.7740, zoom: 6 },
+        'US': { lat: 37.0902, lon: -95.7129, zoom: 4 },
+        'GB': { lat: 55.3781, lon: -3.4360, zoom: 6 },
+        'AU': { lat: -25.2744, lon: 133.7751, zoom: 4 },
+        'IN': { lat: 20.5937, lon: 78.9629, zoom: 5 },
+        'SA': { lat: 23.8859, lon: 45.0792, zoom: 6 },
+        'AE': { lat: 23.4241, lon: 53.8478, zoom: 8 },
+        'JP': { lat: 36.2048, lon: 138.2529, zoom: 6 },
+        'KR': { lat: 35.9078, lon: 127.7669, zoom: 7 },
+        'CN': { lat: 35.8617, lon: 104.1954, zoom: 4 },
+        'BR': { lat: -14.2350, lon: -51.9253, zoom: 4 },
+        'RU': { lat: 61.5240, lon: 105.3188, zoom: 3 },
       };
 
-      const bbox = bboxes[country || 'ID'] || '0,0,0,0';
-      setMapUrl(`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${bbox.split(',')[1]},${bbox.split(',')[0]}`);
+      const target = countryCoords[country || 'ID'] || { lat: 0, lon: 0, zoom: 3 };
+      
+      // Calculate dynamic bbox based on zoom level for "accuracy"
+      // Zoom 5 ~ 10 degrees, Zoom 12 ~ 0.1 degrees
+      const offset = 10 / Math.pow(2, target.zoom - 5);
+      const minLon = target.lon - offset;
+      const minLat = target.lat - offset;
+      const maxLon = target.lon + offset;
+      const maxLat = target.lat + offset;
+
+      setMapUrl(`https://www.openstreetmap.org/export/embed.html?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik&marker=${target.lat},${target.lon}`);
       setIsAnalyzing(false);
     }, 800);
   }, []);
