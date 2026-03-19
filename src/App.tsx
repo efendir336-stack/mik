@@ -194,6 +194,8 @@ export default function App() {
         carrier: carrier,
         type: parsed.getType() || 'Mobile',
         region: country,
+        lat: targetLat,
+        lon: targetLon,
       };
 
       setResult(newResult);
@@ -352,14 +354,24 @@ export default function App() {
                   <p className="text-sm text-zinc-400 leading-relaxed">
                     Nomor ini teridentifikasi berasal dari wilayah <span className="text-zinc-100 font-medium">{result.country}</span>. Anda dapat langsung mengirim pesan tanpa menyimpan nomor.
                   </p>
-                  <a 
-                    href={`https://wa.me/${phoneNumber.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-bold text-emerald-500 hover:text-emerald-400 transition-colors"
-                  >
-                    Buka di WhatsApp <ExternalLink className="w-4 h-4" />
-                  </a>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <a 
+                      href={`https://wa.me/${phoneNumber.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-4 py-3 rounded-xl font-bold transition-all"
+                    >
+                      <MessageCircle className="w-4 h-4" /> Buka di WhatsApp
+                    </a>
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-3 rounded-xl font-bold transition-all border border-zinc-700"
+                    >
+                      <MapPin className="w-4 h-4 text-emerald-500" /> Buka di Google Maps
+                    </a>
+                  </div>
                 </div>
               </motion.div>
             ) : (
