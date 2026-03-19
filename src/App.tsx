@@ -51,6 +51,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [mapUrl, setMapUrl] = useState('https://www.openstreetmap.org/export/embed.html?bbox=95.0,-11.0,141.0,6.0&layer=mapnik'); // Default to Indonesia
   const [activityLog, setActivityLog] = useState<any[]>([]);
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+  const [scanLogs, setScanLogs] = useState<string[]>([]);
 
   // Initial mock data for "Live" feel
   useEffect(() => {
@@ -82,7 +84,29 @@ export default function App() {
     if (!number) return;
     
     setIsAnalyzing(true);
+    setIsDeepScanning(true);
+    setScanLogs([]);
     setError(null);
+
+    const logs = [
+      "Initializing SS7 Protocol...",
+      "Connecting to Global Gateway...",
+      "Querying HLR (Home Location Register)...",
+      "Intercepting VLR (Visitor Location Register)...",
+      "Analyzing Signal Triangulation...",
+      "Calculating BTS Proximity...",
+      "Finalizing Precision Coordinates..."
+    ];
+
+    let currentLogIndex = 0;
+    const logInterval = setInterval(() => {
+      if (currentLogIndex < logs.length) {
+        setScanLogs(prev => [...prev, logs[currentLogIndex]]);
+        currentLogIndex++;
+      } else {
+        clearInterval(logInterval);
+      }
+    }, 400);
 
     // Small delay to simulate "reading" the network
     setTimeout(() => {
@@ -92,16 +116,82 @@ export default function App() {
       if (!parsed || !parsed.isValid()) {
         setError('Nomor tidak valid. Gunakan format internasional (contoh: +62...)');
         setIsAnalyzing(false);
+        setIsDeepScanning(false);
         return;
       }
 
       const country = parsed.country;
       const countryName = new Intl.DisplayNames(['id'], { type: 'region' }).of(country || 'ID');
       
+      let detectedRegion = countryName;
+      let carrier = 'Public Provider';
+      let targetLat = 0;
+      let targetLon = 0;
+      let targetZoom = 5;
+
+      // Extensive Coordinate Database
+      const countryCoords: Record<string, { lat: number, lon: number, zoom: number }> = {
+        'ID': { lat: -0.7893, lon: 113.9213, zoom: 5 },
+        'MY': { lat: 4.2105, lon: 101.9758, zoom: 6 },
+        'SG': { lat: 1.3521, lon: 103.8198, zoom: 12 },
+        'TH': { lat: 15.8700, lon: 100.9925, zoom: 6 },
+        'VN': { lat: 14.0583, lon: 108.2772, zoom: 6 },
+        'PH': { lat: 12.8797, lon: 121.7740, zoom: 6 },
+        'US': { lat: 37.0902, lon: -95.7129, zoom: 4 },
+        'GB': { lat: 55.3781, lon: -3.4360, zoom: 6 },
+        'AU': { lat: -25.2744, lon: 133.7751, zoom: 4 },
+        'IN': { lat: 20.5937, lon: 78.9629, zoom: 5 },
+      };
+
+      const baseTarget = countryCoords[country || 'ID'] || { lat: 0, lon: 0, zoom: 3 };
+      targetLat = baseTarget.lat;
+      targetLon = baseTarget.lon;
+      targetZoom = baseTarget.zoom;
+
+      // Granular Detection for Indonesia (+62)
+      if (country === 'ID') {
+        const nationalNumber = parsed.nationalNumber;
+        const prefix3 = nationalNumber.substring(0, 3);
+
+        // Carrier Mapping
+        if (['811', '812', '813', '821', '822', '852', '853', '823'].includes(prefix3)) carrier = 'Telkomsel';
+        else if (['814', '815', '816', '855', '856', '857', '858'].includes(prefix3)) carrier = 'Indosat Ooredoo';
+        else if (['817', '818', '819', '859', '877', '878'].includes(prefix3)) carrier = 'XL Axiata';
+        else if (['838', '831'].includes(prefix3)) carrier = 'Axis';
+        else if (['895', '896', '897', '898', '899'].includes(prefix3)) carrier = 'Three (3)';
+        else if (['881', '882', '883', '884', '885', '886', '887', '888', '889'].includes(prefix3)) carrier = 'Smartfren';
+
+        // Regional Mapping
+        const regionalData: Record<string, { name: string, lat: number, lon: number }> = {
+          '21': { name: 'Jakarta', lat: -6.2088, lon: 106.8456 },
+          '22': { name: 'Bandung', lat: -6.9175, lon: 107.6191 },
+          '31': { name: 'Surabaya', lat: -7.2575, lon: 112.7521 },
+          '24': { name: 'Semarang', lat: -6.9667, lon: 110.4167 },
+          '274': { name: 'Yogyakarta', lat: -7.7956, lon: 110.3695 },
+          '61': { name: 'Medan', lat: 3.5952, lon: 98.6722 },
+        };
+
+        for (const [code, data] of Object.entries(regionalData)) {
+          if (nationalNumber.startsWith(code)) {
+            detectedRegion = `${data.name}, ${countryName}`;
+            targetLat = data.lat;
+            targetLon = data.lon;
+            targetZoom = 13; // Deep Zoom
+            break;
+          }
+        }
+
+        // Randomize offset for "Precision" look (within 2km radius)
+        if (targetZoom >= 10) {
+          targetLat += (Math.random() - 0.5) * 0.02;
+          targetLon += (Math.random() - 0.5) * 0.02;
+        }
+      }
+
       const newResult = {
         number: parsed.formatInternational(),
-        country: countryName,
-        carrier: 'Public Provider',
+        country: detectedRegion,
+        carrier: carrier,
         type: parsed.getType() || 'Mobile',
         region: country,
       };
@@ -117,40 +207,17 @@ export default function App() {
         status: 'Success'
       }, ...prev.slice(0, 4)]);
 
-      // Extensive Coordinate Database for better accuracy
-      const countryCoords: Record<string, { lat: number, lon: number, zoom: number }> = {
-        'ID': { lat: -0.7893, lon: 113.9213, zoom: 5 },
-        'MY': { lat: 4.2105, lon: 101.9758, zoom: 6 },
-        'SG': { lat: 1.3521, lon: 103.8198, zoom: 12 },
-        'TH': { lat: 15.8700, lon: 100.9925, zoom: 6 },
-        'VN': { lat: 14.0583, lon: 108.2772, zoom: 6 },
-        'PH': { lat: 12.8797, lon: 121.7740, zoom: 6 },
-        'US': { lat: 37.0902, lon: -95.7129, zoom: 4 },
-        'GB': { lat: 55.3781, lon: -3.4360, zoom: 6 },
-        'AU': { lat: -25.2744, lon: 133.7751, zoom: 4 },
-        'IN': { lat: 20.5937, lon: 78.9629, zoom: 5 },
-        'SA': { lat: 23.8859, lon: 45.0792, zoom: 6 },
-        'AE': { lat: 23.4241, lon: 53.8478, zoom: 8 },
-        'JP': { lat: 36.2048, lon: 138.2529, zoom: 6 },
-        'KR': { lat: 35.9078, lon: 127.7669, zoom: 7 },
-        'CN': { lat: 35.8617, lon: 104.1954, zoom: 4 },
-        'BR': { lat: -14.2350, lon: -51.9253, zoom: 4 },
-        'RU': { lat: 61.5240, lon: 105.3188, zoom: 3 },
-      };
+      // Calculate dynamic bbox based on zoom level
+      const offset = 10 / Math.pow(2, targetZoom - 5);
+      const minLon = targetLon - offset;
+      const minLat = targetLat - offset;
+      const maxLon = targetLon + offset;
+      const maxLat = targetLat + offset;
 
-      const target = countryCoords[country || 'ID'] || { lat: 0, lon: 0, zoom: 3 };
-      
-      // Calculate dynamic bbox based on zoom level for "accuracy"
-      // Zoom 5 ~ 10 degrees, Zoom 12 ~ 0.1 degrees
-      const offset = 10 / Math.pow(2, target.zoom - 5);
-      const minLon = target.lon - offset;
-      const minLat = target.lat - offset;
-      const maxLon = target.lon + offset;
-      const maxLat = target.lat + offset;
-
-      setMapUrl(`https://www.openstreetmap.org/export/embed.html?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik&marker=${target.lat},${target.lon}`);
+      setMapUrl(`https://www.openstreetmap.org/export/embed.html?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik&marker=${targetLat},${targetLon}`);
       setIsAnalyzing(false);
-    }, 800);
+      setIsDeepScanning(false);
+    }, 3500); // Longer delay for "Deep Scan" effect
   }, []);
 
   // Auto-trigger when number looks complete
@@ -214,7 +281,7 @@ export default function App() {
                 {isAnalyzing ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Menganalisis...
+                    Deep Scanning...
                   </>
                 ) : (
                   <>
@@ -223,6 +290,29 @@ export default function App() {
                   </>
                 )}
               </button>
+
+              {isDeepScanning && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="bg-zinc-950 rounded-xl p-4 border border-zinc-800 font-mono text-[10px] space-y-1 overflow-hidden"
+                >
+                  {scanLogs.map((log, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-emerald-500 shrink-0">[{new Date().toLocaleTimeString()}]</span>
+                      <span className="text-zinc-400">{log}</span>
+                    </div>
+                  ))}
+                  <div className="w-full h-1 bg-zinc-900 rounded-full mt-2 overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-emerald-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: '100%' }}
+                      transition={{ duration: 3.5 }}
+                    />
+                  </div>
+                </motion.div>
+              )}
               {error && (
                 <motion.p 
                   initial={{ opacity: 0, x: -10 }}
