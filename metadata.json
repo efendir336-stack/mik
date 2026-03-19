@@ -1,0 +1,5 @@
+{
+  "name": "WA Tracker & Analyzer",
+  "description": "Analyze WhatsApp numbers, identify regions, and learn about location sharing features.",
+  "requestFramePermissions": ["geolocation"]
+}
